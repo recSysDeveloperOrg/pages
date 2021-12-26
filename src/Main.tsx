@@ -1,5 +1,5 @@
 import React from "react";
-import {Button, Card, Col, Row, Statistic} from "antd";
+import {Button, Card, Col, message, Row, Statistic} from "antd";
 import {localFetch, Response} from "./api/fetch";
 
 interface ParticipantProps {
@@ -84,18 +84,76 @@ class Main extends React.Component<any, any> {
         this.setState({
             movies: movies.concat(firstPageMovies.movies),
         })
+
+        // 开启页面监听
+        window.addEventListener('scroll', this.handleScroll, false);
+    }
+
+    componentWillUnmount = () => {
+        window.removeEventListener('scroll', this.handleScroll);
+    }
+
+    getScrollTop = () => {
+        let scrollTop = 0, bodyScrollTop = 0, documentScrollTop = 0;
+        if (document.body) {
+            bodyScrollTop = document.body.scrollTop;
+        }
+        if (document.documentElement) {
+            documentScrollTop = document.documentElement.scrollTop;
+        }
+        scrollTop = (bodyScrollTop - documentScrollTop > 0) ? bodyScrollTop : documentScrollTop;
+
+        return scrollTop;
+    }
+
+    getScrollHeight = () => {
+        let scrollHeight = 0, bodyScrollHeight = 0, documentScrollHeight = 0;
+        if (document.body) {
+            bodyScrollHeight = document.body.scrollHeight;
+        }
+        if (document.documentElement) {
+            documentScrollHeight = document.documentElement.scrollHeight;
+        }
+        scrollHeight = (bodyScrollHeight - documentScrollHeight > 0) ? bodyScrollHeight : documentScrollHeight;
+        return scrollHeight;
+    }
+
+    getWindowHeight = () => {
+        let windowHeight = 0;
+        if (document.compatMode === "CSS1Compat"){
+            windowHeight = document.documentElement.clientHeight;
+        } else{
+            windowHeight = document.body.clientHeight;
+        }
+        return windowHeight;
+    }
+
+    handleScroll = async () => {
+        if (this.getScrollHeight() - this.getScrollTop() - this.getWindowHeight() < 10) {
+            window.removeEventListener('scroll', this.handleScroll, false);
+            const moreMovies = await this.requestPageMovies();
+            const movies = this.state.movies;
+            if (moreMovies === undefined || moreMovies.movies === undefined || moreMovies.movies.length === 0) {
+                message.warning("已经划到底部啦~");
+                return;
+            }
+            this.setState({
+                movies: movies.concat(moreMovies.movies),
+            })
+            setTimeout(() => window.addEventListener('scroll', this.handleScroll, false), 300);
+        }
     }
 
     render() {
         return (
         <div>
-                <Row gutter={16}>
-                    {
-                        this.state.movies.map((movieProp, i, a) => {
-                            return <MovieCard movie={movieProp} key={movieProp.id}/>
-                        })
-                    }
-                </Row>
+            <Row gutter={16}>
+                {
+                    this.state.movies.map((movieProp, i, a) => {
+                        return <MovieCard movie={movieProp} key={movieProp.id}/>
+                    })
+                }
+            </Row>
         </div>
     )}
 }
