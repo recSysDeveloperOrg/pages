@@ -1,53 +1,74 @@
-import React from "react";
-import {Button, Card, Col, message, Row, Statistic} from "antd";
+import React, {Component} from "react";
+import {Button, Card, Col, Descriptions, Drawer, Input, message, Modal, Row, Statistic, Table} from "antd";
 import {localFetch, Response} from "./api/fetch";
+import {MovieProps, recommendReasonType2Tip} from "./movie";
+import DescriptionsItem from "antd/es/descriptions/Item";
 
-interface ParticipantProps {
-    Character: string
-    Name: string
-}
-enum RecommendReasonType {
-    RECOMMEND_REASON_TYPE_TAG = 0,
-    RECOMMEND_REASON_TYPE_MOVIE = 1,
-    RECOMMEND_REASON_TYPE_LOG = 2,
-    RECOMMEND_REASON_TYPE_TOP_K = 3
-}
-interface RecommendReasonProps {
-    movie_reason: MovieProps
-    tag_reason: string
-    reason_type: RecommendReasonType
-}
-
-interface MovieProps {
-    id: string
-    title: string
-    pic_url: string
-    introduction?: string
-    participants?: Array<ParticipantProps>
-    release_date?: number
-    language?: string
-    reason?: RecommendReasonProps
-    average_rating?: number
-}
 interface MovieRecommendResponse extends Response {
     movies: Array<MovieProps>
 }
 
-class MovieCard extends React.Component<any, any> {
+class MovieCard extends Component<any, any> {
+    state = {
+        visible: false,
+    };
+
     render() {
-        const movieProps: MovieProps = this.props.movie;
+        const movieProps:MovieProps = this.props.movie;
+        if (movieProps.participant) {
+            for (const i in movieProps.participant) {
+                movieProps.participant[i]['key'] = `${i}`;
+            }
+        }
+        const columns = [
+            {
+                title: '演员名字',
+                dataIndex: 'name',
+                key: 'key',
+            },
+            {
+                title: '角色名字',
+                dataIndex: 'character',
+                key: 'key',
+            }
+        ]
         return (
-            <><Card title={movieProps.title} hoverable style={{width: 300, height: 600, marginLeft:10, marginTop: 16}} loading={this.props.loading}
-                      cover={<img alt={movieProps.title} style={{width:300, height:450}} src={movieProps.pic_url}/>}>
+            <><Card title={movieProps.title} hoverable style={{width: 300, height: 600, marginLeft:10, marginTop: 16}}
+                    cover={<img alt={movieProps.title} style={{width:300, height:450}} src={movieProps.pic_url}/>}>
                 <Row>
                     <Col span={12}>
                         <Statistic title="评分" value={movieProps.average_rating} suffix="/5"/>
                     </Col>
                     <Col span={12}>
-                        <Button style={{marginTop: 16, float:"right"}} type="primary">查看详情</Button>
+                        <Button style={{marginTop: 16, float:"right"}} type="primary" onClick={() => this.setState({visible: true})}>
+                            查看详情
+                        </Button>
                     </Col>
                 </Row>
-                </Card>
+            </Card>
+
+            <div>
+                <Drawer width="88%" visible={this.state.visible} onClose={() => this.setState({visible: false})}>
+                    <Descriptions title={movieProps.title} layout="vertical" bordered>
+                        <DescriptionsItem label="上映日期">
+                            {movieProps.release_date}
+                        </DescriptionsItem>
+                        <DescriptionsItem label="语言">
+                            {movieProps.language}
+                        </DescriptionsItem>
+                        <DescriptionsItem label="电影均分">
+                            {movieProps.average_rating}
+                        </DescriptionsItem>
+                        <DescriptionsItem label="简介">
+                            {movieProps.introduction}
+                        </DescriptionsItem>
+                        <DescriptionsItem label="参演演员列表">
+                            <Table columns={columns} dataSource={movieProps.participant}/>
+                        </DescriptionsItem>
+                    </Descriptions>
+                    {movieProps.reason?.reason_type ? `该电影基于${recommendReasonType2Tip.get(movieProps.reason.reason_type)}推荐`: ''}
+                </Drawer>
+            </div>
             </>
         )
     }
@@ -147,7 +168,8 @@ class Main extends React.Component<any, any> {
     render() {
         return (
         <div>
-            <Row gutter={16}>
+            <User/>
+            <Row gutter={16} style={{margin: "0 auto", width: "90%"}}>
                 {
                     this.state.movies.map((movieProp, i, a) => {
                         return <MovieCard movie={movieProp} key={movieProp.id}/>
@@ -156,6 +178,69 @@ class Main extends React.Component<any, any> {
             </Row>
         </div>
     )}
+}
+
+interface LoginResponse extends Response {
+    access_token:string
+    refresh_token:string
+}
+
+class User extends Component<any, any> {
+    state = {
+        isLogin: false,
+        accessToken: "",
+        showLoginModal: false,
+        inputs: {
+            username: '',
+            password: '',
+        },
+    };
+
+    handleLogin = () => {
+        this.setState({
+            showLoginModal: true,
+        })
+    }
+    handleCancelLogin = () => {
+        this.setState({
+            showLoginModal: false,
+        })
+    }
+    handleLoginSubmit = async () => {
+        const username = this.state.inputs['username'];
+        const password = this.state.inputs['password'];
+        const loginResp = await localFetch.PostFetch<LoginResponse>('/user/login', {
+            username, password,
+        });
+
+    }
+    handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+        const inputs = Object.assign(this.state.inputs, {
+            [field]: e.target.value,
+        })
+        this.setState({inputs});
+    }
+
+    render() {
+        return (
+            <div>
+                <div style={{marginTop: 16, float: "right"}}>
+                    <Button type="primary" hidden={this.state.isLogin} onClick={() => this.handleLogin()}>
+                        登录
+                    </Button>
+                </div>
+
+                <Modal title="登录" visible={this.state.showLoginModal}
+                       onOk={() => this.handleLoginSubmit()}
+                       onCancel={() => this.handleCancelLogin()}>
+                    <Input size="large" placeholder="用户名"
+                    onChange={e => this.handleInputChange(e, 'username')}/>
+                    <Input style={{marginTop: 12}} size="large" placeholder="密码"
+                    onChange={e => this.handleInputChange(e, 'password')}/>
+                </Modal>
+            </div>
+        )
+    }
 }
 
 export {Main}

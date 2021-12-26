@@ -10,7 +10,7 @@ const routers: Array<router> = [
     {
         path: "/main",
         component: Main,
-    }
+    },
 ]
 
 export default routers
