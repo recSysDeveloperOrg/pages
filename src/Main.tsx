@@ -1,17 +1,39 @@
 import React, {Component} from "react";
-import {Button, Card, Col, Descriptions, Drawer, Input, message, Modal, Row, Statistic, Table} from "antd";
+import {Button, Card, Col, Descriptions, Drawer, Input, message, Modal, Row, Statistic, Table, Tag} from "antd";
 import {localFetch, Response} from "./api/fetch";
 import {MovieProps, recommendReasonType2Tip} from "./movie";
 import DescriptionsItem from "antd/es/descriptions/Item";
+import {Tag as TagEntity} from "./tag";
 
 interface MovieRecommendResponse extends Response {
     movies: Array<MovieProps>
+}
+interface QueryMovieTopNTagResponse extends Response {
+    tags: Array<TagEntity>
 }
 
 class MovieCard extends Component<any, any> {
     state = {
         visible: false,
+        tags: Array<TagEntity>(),
     };
+
+    openDrawer = async(movieID: string) => {
+        const topNTagResp = await localFetch.PostFetch<QueryMovieTopNTagResponse>('/tag/movie-top-k', {
+            n: 10,
+            movieID: movieID,
+        })
+        for (const i in topNTagResp.tags) {
+            topNTagResp.tags[i]['key'] = `${i}`;
+        }
+        if (topNTagResp.tags === undefined) {
+            topNTagResp.tags = Array<TagEntity>();
+        }
+        this.setState({
+            tags: topNTagResp.tags,
+            visible: true,
+        });
+    }
 
     render() {
         const movieProps:MovieProps = this.props.movie;
@@ -40,7 +62,7 @@ class MovieCard extends Component<any, any> {
                         <Statistic title="评分" value={movieProps.average_rating} suffix="/5"/>
                     </Col>
                     <Col span={12}>
-                        <Button style={{marginTop: 16, float:"right"}} type="primary" onClick={() => this.setState({visible: true})}>
+                        <Button style={{marginTop: 16, float:"right"}} type="primary" onClick={() => this.openDrawer(movieProps.id)}>
                             查看详情
                         </Button>
                     </Col>
@@ -62,11 +84,19 @@ class MovieCard extends Component<any, any> {
                         <DescriptionsItem label="简介">
                             {movieProps.introduction}
                         </DescriptionsItem>
-                        <DescriptionsItem label="参演演员列表">
-                            <Table columns={columns} dataSource={movieProps.participant}/>
+                        <DescriptionsItem label="最多的10个标签">
+                            {
+                                this.state.tags.map((tag:TagEntity, i, a) => {
+                                    return (
+                                        <Tag color="orange" key={tag.key}>
+                                            {tag.content}
+                                        </Tag>
+                                    )
+                                })
+                            }
                         </DescriptionsItem>
                     </Descriptions>
-                    {movieProps.reason?.reason_type ? `该电影基于${recommendReasonType2Tip.get(movieProps.reason.reason_type)}推荐`: ''}
+                    <Table style={{marginTop: 16}} columns={columns} dataSource={movieProps.participant}/>
                 </Drawer>
             </div>
             </>
@@ -164,11 +194,25 @@ class Main extends React.Component<any, any> {
             setTimeout(() => window.addEventListener('scroll', this.handleScroll, false), 300);
         }
     }
+    refreshMovieArray = async () => {
+        await this.setState({
+            page: {
+                nPage: 0,
+                nSize: 20,
+            },
+            movies: Array<MovieProps>(),
+        });
+        const firstPageMovies = await this.requestPageMovies();
+        const movies = this.state.movies;
+        this.setState({
+            movies: movies.concat(firstPageMovies.movies),
+        });
+    }
 
     render() {
         return (
         <div>
-            <User/>
+            <User refreshMovie={this.refreshMovieArray}/>
             <Row gutter={16} style={{margin: "0 auto", width: "90%"}}>
                 {
                     this.state.movies.map((movieProp, i, a) => {
@@ -185,6 +229,23 @@ interface LoginResponse extends Response {
     refresh_token:string
 }
 
+enum Gender {
+    MALE = 0,
+    FEMALE = 1,
+    UNDEFINED = 999
+}
+
+interface User {
+    id: string
+    name: string
+    gender: Gender
+}
+
+interface QueryResponse extends Response {
+    user: User
+    access_token?: string
+}
+
 class User extends Component<any, any> {
     state = {
         isLogin: false,
@@ -194,12 +255,28 @@ class User extends Component<any, any> {
             username: '',
             password: '',
         },
+        user: {
+            id: '',
+            name: '',
+            gender: undefined,
+        },
     };
+
+    async componentDidMount() {
+        await this.queryUserByAccessToken();
+    }
 
     handleLogin = () => {
         this.setState({
             showLoginModal: true,
         })
+    }
+    handleLogout = async() => {
+        window.localStorage.removeItem('access_token');
+        this.setState({
+            isLogin: false,
+        });
+        await this.props.refreshMovie();
     }
     handleCancelLogin = () => {
         this.setState({
@@ -212,13 +289,40 @@ class User extends Component<any, any> {
         const loginResp = await localFetch.PostFetch<LoginResponse>('/user/login', {
             username, password,
         });
-
+        const {base_resp, access_token, refresh_token} = loginResp;
+        if (base_resp.err_no !== undefined) {
+            message.error(base_resp.err_msg);
+            return;
+        }
+        window.localStorage.setItem('access_token', access_token);
+        window.localStorage.setItem('refresh_token', refresh_token);
+        this.setState({
+            isLogin: true,
+            showLoginModal: false,
+        });
+        await this.queryUserByAccessToken();
+        await this.props.refreshMovie();
     }
     handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
         const inputs = Object.assign(this.state.inputs, {
             [field]: e.target.value,
-        })
+        });
         this.setState({inputs});
+    }
+    queryUserByAccessToken = async () => {
+        const accessToken = window.localStorage.getItem('access_token');
+        const queryUserResp = await localFetch.PostFetch<QueryResponse>('/user/', {
+            accessToken,
+        });
+        if (queryUserResp.base_resp.err_no !== undefined) {
+            message.error(queryUserResp.base_resp.err_msg);
+            this.setState({isLogin: false});
+            return;
+        }
+        this.setState({
+            isLogin: true,
+            user: queryUserResp.user,
+        });
     }
 
     render() {
@@ -227,6 +331,12 @@ class User extends Component<any, any> {
                 <div style={{marginTop: 16, float: "right"}}>
                     <Button type="primary" hidden={this.state.isLogin} onClick={() => this.handleLogin()}>
                         登录
+                    </Button>
+                    <span hidden={!this.state.isLogin}>
+                        {this.state.user.name}
+                    </span>
+                    <Button type="primary" hidden={!this.state.isLogin} onClick={() => this.handleLogout()}>
+                        登出
                     </Button>
                 </div>
 

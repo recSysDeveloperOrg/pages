@@ -39,6 +39,10 @@ class Fetch implements HttpRequest {
         Object.keys(params).forEach((key: string) => {
             formData.append(key, params[key]);
         });
+        const accessToken = window.localStorage.getItem('access_token');
+        if (accessToken !== null) {
+            formData.append('accessToken', accessToken);
+        }
         const fetchOptions = {
             method: "POST",
             body: formData,
