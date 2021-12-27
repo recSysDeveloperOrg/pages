@@ -1,14 +1,16 @@
 import React, {Component} from "react";
-import {Button, Card, Col, Descriptions, Drawer, Input, message, Modal, Row, Statistic, Table, Tag} from "antd";
+import {Button, Card, Col, Descriptions, Drawer, Input, message, Modal, Row, Statistic, Table, Tabs, Tag} from "antd";
 import {localFetch, Response} from "./api/fetch";
 import {MovieProps, recommendReasonType2Tip} from "./movie";
 import DescriptionsItem from "antd/es/descriptions/Item";
 import {Tag as TagEntity} from "./tag";
+import EditableTagGroup from "./EditableTagGroup";
+const {TabPane} = Tabs;
 
 interface MovieRecommendResponse extends Response {
     movies: Array<MovieProps>
 }
-interface QueryMovieTopNTagResponse extends Response {
+interface TopKTagResponse extends Response {
     tags: Array<TagEntity>
 }
 
@@ -19,7 +21,7 @@ class MovieCard extends Component<any, any> {
     };
 
     openDrawer = async(movieID: string) => {
-        const topNTagResp = await localFetch.PostFetch<QueryMovieTopNTagResponse>('/tag/movie-top-k', {
+        const topNTagResp = await localFetch.PostFetch<TopKTagResponse>('/tag/movie-top-k', {
             n: 10,
             movieID: movieID,
         })
@@ -96,7 +98,20 @@ class MovieCard extends Component<any, any> {
                             }
                         </DescriptionsItem>
                     </Descriptions>
-                    <Table style={{marginTop: 16}} columns={columns} dataSource={movieProps.participant}/>
+                    <Tabs defaultActiveKey="1" style={{marginTop: 16}}>
+                        <TabPane tab="我的标签" key="1">
+                            <EditableTagGroup movieID={movieProps.id}/>
+                        </TabPane>
+                        <TabPane tab="我的评分" key="2">
+
+                        </TabPane>
+                        <TabPane tab="演员列表" key="3">
+                            <Table style={{marginTop: 16}} columns={columns} dataSource={movieProps.participant}/>
+                        </TabPane>
+                        <TabPane tab="推荐反馈" key="4">
+
+                        </TabPane>
+                    </Tabs>
                 </Drawer>
             </div>
             </>
