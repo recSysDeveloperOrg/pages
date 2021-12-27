@@ -55,6 +55,6 @@ class Fetch implements HttpRequest {
 
 }
 
-const localFetch = new Fetch("localhost", 8080, 1)
+const localFetch = new Fetch("172.17.168.4", 49999, 1)
 export {localFetch, ResolveBaseResponse, ResponseStatus};
 export type { Response };
