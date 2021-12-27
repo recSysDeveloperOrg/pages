@@ -4,10 +4,10 @@ interface ParticipantProps {
     name: string
 }
 enum RecommendReasonType {
-    RECOMMEND_REASON_TYPE_TAG = 0,
-    RECOMMEND_REASON_TYPE_MOVIE = 1,
-    RECOMMEND_REASON_TYPE_LOG = 2,
-    RECOMMEND_REASON_TYPE_TOP_K = 3
+    RECOMMEND_REASON_TYPE_TAG = 1,
+    RECOMMEND_REASON_TYPE_MOVIE = 2,
+    RECOMMEND_REASON_TYPE_LOG = 3,
+    RECOMMEND_REASON_TYPE_TOP_K = 4
 }
 const recommendReasonType2Tip = new Map<RecommendReasonType, string>();
 recommendReasonType2Tip.set(RecommendReasonType.RECOMMEND_REASON_TYPE_TAG, "历史标签");

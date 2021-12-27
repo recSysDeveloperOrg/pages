@@ -5,15 +5,15 @@ import {
     Col,
     Input,
     message,
-    Modal,
+    Modal, Radio,
     Row,
     Statistic,
 } from "antd";
 import {localFetch, Response} from "./api/fetch";
-import {MovieProps, ParticipantProps, RecommendReasonProps} from "./movie";
+import {MovieProps, ParticipantProps} from "./movie";
 import {Tag as TagEntity} from "./tag";
 import MovieDetail from "./MovieDetail";
-import movieDetail from "./MovieDetail";
+import {MovieSearch, MovieSearchResponse} from "./MovieSearch";
 
 interface MovieRecommendResponse extends Response {
     movies: Array<MovieProps>
@@ -185,6 +185,13 @@ class Main extends React.Component<any, any> {
             nSize: 20,
         },
         movies: Array<MovieProps>(),
+        renderHistory: {
+            page: 0,
+            size: 20,
+            movies: Array<MovieProps>(),
+        },
+        isInSearchMode: false,
+        searchKeyword: undefined,
     };
 
     requestPageMovies = async () => {
@@ -192,11 +199,25 @@ class Main extends React.Component<any, any> {
             nPage: this.state.page.nPage + 1,
             nSize: this.state.page.nSize,
         };
-        const movies = await localFetch.PostFetch<MovieRecommendResponse>("/movie/recommend", {
-            "page": this.state.page.nPage,
-            "offset": this.state.page.nSize,
-        });
+        let movies:Array<MovieProps> = new Array<MovieProps>();
+        if (this.state.isInSearchMode) {
+            const searchResponse = await localFetch.PostFetch<MovieSearchResponse>("/movie/search", {
+                "page": this.state.page.nPage,
+                "offset": this.state.page.nSize,
+                "keyword": this.state.searchKeyword,
+            });
+            if (searchResponse.movies) {
+                movies = searchResponse.movies.map(x => x.movie);
+            }
+        }else {
+            const recommendResponse = await localFetch.PostFetch<MovieRecommendResponse>("/movie/recommend", {
+                "page": this.state.page.nPage,
+                "offset": this.state.page.nSize,
+            });
+            movies = recommendResponse.movies;
+        }
         this.setState({
+            ...this.state,
             page: page,
         });
 
@@ -207,7 +228,8 @@ class Main extends React.Component<any, any> {
         const firstPageMovies = await this.requestPageMovies();
         const movies = this.state.movies;
         this.setState({
-            movies: movies.concat(firstPageMovies.movies),
+            ...this.state,
+            movies: movies.concat(firstPageMovies),
         })
 
         // 开启页面监听
@@ -258,12 +280,13 @@ class Main extends React.Component<any, any> {
             window.removeEventListener('scroll', this.handleScroll, false);
             const moreMovies = await this.requestPageMovies();
             const movies = this.state.movies;
-            if (moreMovies === undefined || moreMovies.movies === undefined || moreMovies.movies.length === 0) {
+            if (moreMovies === undefined || moreMovies.length === 0) {
                 message.warning("已经划到底部啦~");
                 return;
             }
             this.setState({
-                movies: movies.concat(moreMovies.movies),
+                ...this.state,
+                movies: movies.concat(moreMovies),
             })
             setTimeout(() => window.addEventListener('scroll', this.handleScroll, false), 300);
         }
@@ -279,14 +302,57 @@ class Main extends React.Component<any, any> {
         const firstPageMovies = await this.requestPageMovies();
         const movies = this.state.movies;
         this.setState({
-            movies: movies.concat(firstPageMovies.movies),
+            ...this.state,
+            movies: movies.concat(firstPageMovies),
+        });
+    }
+    renderSearchMovies = async (keyword: string) => {
+        const renderHistory = this.state.isInSearchMode ? this.state.renderHistory : {
+            page: this.state.page.nPage,
+            size: this.state.page.nSize,
+            movies: this.state.movies,
+        };
+        const state = {
+            movies: new Array<MovieProps>(),
+            searchKeyword: keyword,
+            renderHistory: renderHistory,
+            page: {
+              nPage: 0,
+              nSize: 20,
+            },
+            isInSearchMode: true,
+        };
+        await this.setState({
+            ...state,
+        });
+        const firstPageSearchMovies = await this.requestPageMovies();
+        this.setState({
+            ...this.state,
+            movies: firstPageSearchMovies,
+        });
+    }
+    stopRenderSearchMovies = () => {
+        const state = {
+            movies: this.state.renderHistory.movies,
+            page: {
+                nPage: this.state.renderHistory.page,
+                nSize: this.state.renderHistory.size,
+            },
+            isInSearchMode: false,
+        };
+        this.setState({
+            ...state,
         });
     }
 
     render() {
         return (
         <div>
-            <User refreshMovie={this.refreshMovieArray}/>
+            <div style={{height: 55}}>
+                <User refreshMovie={this.refreshMovieArray}/>
+            </div>
+            <MovieSearch renderSearchMovies={(keyword: string) => this.renderSearchMovies(keyword)}
+                         stopRenderSearchMovies={() => this.stopRenderSearchMovies()}/>
             <Row gutter={16} style={{margin: "0 auto", width: "90%"}}>
                 {
                     this.state.movies.map((movieProp, i, a) => {
@@ -325,6 +391,8 @@ class User extends Component<any, any> {
         isLogin: false,
         accessToken: "",
         showLoginModal: false,
+        showRegisterModal: false,
+        genderValue: 1,
         inputs: {
             username: '',
             password: '',
@@ -398,6 +466,57 @@ class User extends Component<any, any> {
             user: queryUserResp.user,
         });
     }
+    handleRegister = () => {
+        const state = {
+            ...this.state,
+            showRegisterModal: true,
+        };
+        this.setState({
+            ...state,
+        });
+    }
+    handleGenderChange = (e:any) => {
+        const state = {
+            ...this.state,
+            genderValue: e.target.value,
+        };
+        this.setState({
+            ...state,
+        });
+    }
+    handleCancelRegister = () => {
+        const state = {
+            ...this.state,
+            showRegisterModal: false,
+        };
+        this.setState({
+            ...state,
+        });
+    }
+    handleRegisterSubmit = async () => {
+        const genderSelection2English = {
+            1: "MALE",
+            2: "FEMALE",
+        };
+        const registerResp = await localFetch.PostFetch<Response>('/user/register', {
+            username: this.state.inputs.username,
+            password: this.state.inputs.password,
+            // @ts-ignore
+            gender: genderSelection2English[this.state.genderValue],
+        });
+        if (registerResp.base_resp.err_no !== undefined) {
+            message.error(registerResp.base_resp.err_msg);
+            return;
+        }
+        message.success("注册成功~");
+        const state = {
+            ...this.state,
+            showRegisterModal: false,
+        };
+        this.setState({
+            ...state,
+        });
+    }
 
     render() {
         return (
@@ -405,6 +524,9 @@ class User extends Component<any, any> {
                 <div style={{marginTop: 16, float: "right"}}>
                     <Button type="primary" hidden={this.state.isLogin} onClick={() => this.handleLogin()}>
                         登录
+                    </Button>
+                    <Button type="primary" style={{marginLeft: 8}} hidden={this.state.isLogin} onClick={() => this.handleRegister()}>
+                        注册
                     </Button>
                     <span hidden={!this.state.isLogin}>
                         {this.state.user.name}
@@ -421,6 +543,18 @@ class User extends Component<any, any> {
                     onChange={e => this.handleInputChange(e, 'username')}/>
                     <Input style={{marginTop: 12}} size="large" placeholder="密码"
                     onChange={e => this.handleInputChange(e, 'password')}/>
+                </Modal>
+                <Modal title="注册" visible={this.state.showRegisterModal}
+                       onOk={() => this.handleRegisterSubmit()}
+                       onCancel={() => this.handleCancelRegister()}>
+                    <Input size="large" placeholder="用户名"
+                           onChange={e => this.handleInputChange(e, 'username')}/>
+                    <Input style={{marginTop: 12}} size="large" placeholder="密码"
+                           onChange={e => this.handleInputChange(e, 'password')}/>
+                    <Radio.Group onChange={this.handleGenderChange} value={this.state.genderValue}>
+                        <Radio value={1}>男</Radio>
+                        <Radio value={2}>女</Radio>
+                    </Radio.Group>
                 </Modal>
             </div>
         )

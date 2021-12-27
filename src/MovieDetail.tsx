@@ -1,12 +1,27 @@
-import {Button, Descriptions, Drawer, Rate, Table, Tabs, Tag} from "antd";
+import {Button, Descriptions, Drawer, message, Rate, Table, Tabs, Tag} from "antd";
 import DescriptionsItem from "antd/es/descriptions/Item";
 import {Tag as TagEntity} from "./tag";
 import EditableTagGroup from "./EditableTagGroup";
 import {MovieProps, RecommendReasonType} from "./movie";
 import React from "react";
+import {DislikeOutlined} from '@ant-design/icons';
+import {localFetch, Response} from "./api/fetch";
+
 const {TabPane} = Tabs;
 
 class MovieDetail extends React.Component<any, any> {
+    handleDislike = async (sourceID: string, sourceType: string) => {
+        const feedbackResponse = await localFetch.PostFetch<Response>('/movie/recommend-feedback', {
+            'ft': sourceType,
+            'sourceID': sourceID,
+        });
+        if (feedbackResponse.base_resp.err_no !== undefined) {
+            message.error(feedbackResponse.base_resp.err_msg);
+            return;
+        }
+        message.success("感谢反馈~");
+    }
+
     render() {
         const columns = [
             {
@@ -70,15 +85,25 @@ class MovieDetail extends React.Component<any, any> {
                         <div hidden={reason !== RecommendReasonType.RECOMMEND_REASON_TYPE_MOVIE}>
                             我们根据您为 {
                             <Button type="link" onClick={() => this.props.showSourceMovieDetail(movieProps.reason?.movie_reason.id)}>
-                                {movieProps.reason?.movie_reason.title}</Button>} 的评分记录推荐了这部电影
+                                {movieProps.reason?.movie_reason && movieProps.reason?.movie_reason.title}</Button>} 的评分记录推荐了这部电影
                         </div>
                         <div hidden={reason !== RecommendReasonType.RECOMMEND_REASON_TYPE_LOG}>
                             我们根据您浏览了 {
                             <Button type="link" onClick={() => this.props.showSourceMovieDetail(movieProps.reason?.movie_reason.id)}>
-                                {movieProps.reason?.movie_reason.title}</Button>} 推荐了这部电影
+                                {movieProps.reason?.movie_reason && movieProps.reason?.movie_reason.title}</Button>} 推荐了这部电影
+                            <div>
+                                <Button type="primary" icon={<DislikeOutlined />} onClick={() => this.handleDislike(movieProps.id, "movie")}>
+                                    不喜欢
+                                </Button>
+                            </div>
                         </div>
                         <div hidden={reason !== RecommendReasonType.RECOMMEND_REASON_TYPE_TAG}>
                             我们根据您的历史标签 ` {movieProps.reason?.tag_reason} ` 记录推荐了这部电影
+                            <div>
+                                <Button type="primary" icon={<DislikeOutlined />} onClick={() => this.handleDislike(movieProps.id, "tag")}>
+                                    不喜欢
+                                </Button>
+                            </div>
                         </div>
                     </TabPane>
                 </Tabs>
