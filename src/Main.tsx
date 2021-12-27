@@ -1,39 +1,141 @@
 import React, {Component} from "react";
-import {Button, Card, Col, Descriptions, Drawer, Input, message, Modal, Row, Statistic, Table, Tabs, Tag} from "antd";
+import {
+    Button,
+    Card,
+    Col,
+    Input,
+    message,
+    Modal,
+    Row,
+    Statistic,
+} from "antd";
 import {localFetch, Response} from "./api/fetch";
-import {MovieProps, recommendReasonType2Tip} from "./movie";
-import DescriptionsItem from "antd/es/descriptions/Item";
+import {MovieProps, ParticipantProps, RecommendReasonProps} from "./movie";
 import {Tag as TagEntity} from "./tag";
-import EditableTagGroup from "./EditableTagGroup";
-const {TabPane} = Tabs;
+import MovieDetail from "./MovieDetail";
+import movieDetail from "./MovieDetail";
 
 interface MovieRecommendResponse extends Response {
     movies: Array<MovieProps>
 }
+interface MovieDetailResponse extends Response {
+    movie: MovieProps
+}
 interface TopKTagResponse extends Response {
     tags: Array<TagEntity>
 }
+interface UserMovieRatingResponse extends Response {
+    movie_id2_personal_rating: Map<string, number>
+}
 
 class MovieCard extends Component<any, any> {
-    state = {
+    defaultState = {
         visible: false,
+        movie: {
+            id: '',
+            title: '',
+            pic_url: '',
+            introduction: '',
+            participant: Array<ParticipantProps>(),
+            release_date: 0,
+            language: '',
+            reason: undefined,
+            average_rating: 0,
+        },
         tags: Array<TagEntity>(),
+        userRating: 0,
     };
 
-    openDrawer = async(movieID: string) => {
+    state = {
+        first: {
+            ...this.defaultState,
+        },
+        second: {
+            ...this.defaultState,
+        },
+    };
+
+    openDrawer = async(movie: MovieProps, drawerID: string) => {
+        const movieID = movie.id;
+        // 需要给getMovieDetail发一次请求记录历史记录
+        const movieDetail = await localFetch.PostFetch<MovieDetailResponse>(`/movie/${movieID}`, {});
+        movieDetail.movie.reason = movie.reason;
+
         const topNTagResp = await localFetch.PostFetch<TopKTagResponse>('/tag/movie-top-k', {
             n: 10,
             movieID: movieID,
-        })
+        });
         for (const i in topNTagResp.tags) {
             topNTagResp.tags[i]['key'] = `${i}`;
+        }
+        if (movieDetail.movie.participant) {
+            for (const i in movieDetail.movie.participant) {
+                movieDetail.movie.participant[i]['key'] = `${i}`;
+            }
         }
         if (topNTagResp.tags === undefined) {
             topNTagResp.tags = Array<TagEntity>();
         }
-        this.setState({
+
+        const ratingResp = await localFetch.PostFetch<UserMovieRatingResponse>('/rate/movie', {
+            movieIDs: [movieID],
+        });
+        let userRating;
+        if (ratingResp.movie_id2_personal_rating !== undefined) {
+            for (const mid in ratingResp.movie_id2_personal_rating) {
+                // @ts-ignore
+                userRating = ratingResp.movie_id2_personal_rating[mid];
+            }
+        }
+        const drawer = {
+            // @ts-ignore
+            ...this.state[drawerID],
+            movie: movieDetail.movie,
             tags: topNTagResp.tags,
             visible: true,
+            userRating: userRating,
+        };
+        this.setState({
+            [drawerID]: drawer,
+        });
+    }
+
+    closeDrawer = (drawerID: string) => {
+        const drawer = {
+            // @ts-ignore
+            ...this.state[drawerID],
+            visible: false,
+        }
+        this.setState({
+            [drawerID]: drawer,
+        })
+    }
+
+    showSourceMovieDetail = async (movieID: string) => {
+        await this.openDrawer({
+            id: movieID,
+            title: '',
+            pic_url: '',
+            introduction: '',
+        }, "second");
+    }
+
+    handleRateChange = async(e: number, movieID: string, drawerID: string) => {
+        const rateResp = await localFetch.PostFetch<Response>('/rate/', {
+            rating: e,
+            movieID: movieID,
+        });
+        if (rateResp.base_resp.err_no !== undefined) {
+            message.error(rateResp.base_resp.err_msg);
+            return;
+        }
+        const drawer = {
+            // @ts-ignore
+            ...this.state[drawerID],
+            userRating: e,
+        }
+        this.setState({
+            [drawerID]: drawer,
         });
     }
 
@@ -44,18 +146,7 @@ class MovieCard extends Component<any, any> {
                 movieProps.participant[i]['key'] = `${i}`;
             }
         }
-        const columns = [
-            {
-                title: '演员名字',
-                dataIndex: 'name',
-                key: 'key',
-            },
-            {
-                title: '角色名字',
-                dataIndex: 'character',
-                key: 'key',
-            }
-        ]
+
         return (
             <><Card title={movieProps.title} hoverable style={{width: 300, height: 600, marginLeft:10, marginTop: 16}}
                     cover={<img alt={movieProps.title} style={{width:300, height:450}} src={movieProps.pic_url}/>}>
@@ -64,56 +155,24 @@ class MovieCard extends Component<any, any> {
                         <Statistic title="评分" value={movieProps.average_rating} suffix="/5"/>
                     </Col>
                     <Col span={12}>
-                        <Button style={{marginTop: 16, float:"right"}} type="primary" onClick={() => this.openDrawer(movieProps.id)}>
+                        <Button style={{marginTop: 16, float:"right"}} type="primary" onClick={() => this.openDrawer(movieProps, "first")}>
                             查看详情
                         </Button>
                     </Col>
                 </Row>
+                <MovieDetail tags={this.state.first.tags}
+                             movie={this.state.first.movie}
+                             visible={this.state.first.visible}
+                             userRating={this.state.first.userRating} onClose={() => this.closeDrawer("first")}
+                             showSourceMovieDetail={(movieID: string) => this.showSourceMovieDetail(movieID)}
+                             onRateChange={(e: number, movieID: string) => this.handleRateChange(e, movieID, "first")}/>
+                <MovieDetail tags={this.state.second.tags}
+                             movie={this.state.second.movie}
+                             visible={this.state.second.visible}
+                             userRating={this.state.second.userRating} onClose={() => this.closeDrawer("second")}
+                             showSourceMovieDetail={(movieID: string) => this.showSourceMovieDetail(movieID)}
+                             onRateChange={(e: number, movieID: string) => this.handleRateChange(e, movieID, "second")}/>
             </Card>
-
-            <div>
-                <Drawer width="88%" visible={this.state.visible} onClose={() => this.setState({visible: false})}>
-                    <Descriptions title={movieProps.title} layout="vertical" bordered>
-                        <DescriptionsItem label="上映日期">
-                            {movieProps.release_date}
-                        </DescriptionsItem>
-                        <DescriptionsItem label="语言">
-                            {movieProps.language}
-                        </DescriptionsItem>
-                        <DescriptionsItem label="电影均分">
-                            {movieProps.average_rating}
-                        </DescriptionsItem>
-                        <DescriptionsItem label="简介">
-                            {movieProps.introduction}
-                        </DescriptionsItem>
-                        <DescriptionsItem label="最多的10个标签">
-                            {
-                                this.state.tags.map((tag:TagEntity, i, a) => {
-                                    return (
-                                        <Tag color="orange" key={tag.key}>
-                                            {tag.content}
-                                        </Tag>
-                                    )
-                                })
-                            }
-                        </DescriptionsItem>
-                    </Descriptions>
-                    <Tabs defaultActiveKey="1" style={{marginTop: 16}}>
-                        <TabPane tab="我的标签" key="1">
-                            <EditableTagGroup movieID={movieProps.id}/>
-                        </TabPane>
-                        <TabPane tab="我的评分" key="2">
-
-                        </TabPane>
-                        <TabPane tab="演员列表" key="3">
-                            <Table style={{marginTop: 16}} columns={columns} dataSource={movieProps.participant}/>
-                        </TabPane>
-                        <TabPane tab="推荐反馈" key="4">
-
-                        </TabPane>
-                    </Tabs>
-                </Drawer>
-            </div>
             </>
         )
     }
