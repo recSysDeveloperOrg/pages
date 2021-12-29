@@ -10,7 +10,11 @@ import {localFetch, Response} from "./api/fetch";
 const {TabPane} = Tabs;
 
 class MovieDetail extends React.Component<any, any> {
-    handleDislike = async (sourceID: string, sourceType: string) => {
+    handleDislike = async (sourceID: string|undefined, sourceType: string) => {
+        if (sourceID === undefined) {
+            return;
+        }
+
         const feedbackResponse = await localFetch.PostFetch<Response>('/movie/recommend-feedback', {
             'ft': sourceType,
             'sourceID': sourceID,
@@ -100,7 +104,7 @@ class MovieDetail extends React.Component<any, any> {
                         <div hidden={reason !== RecommendReasonType.RECOMMEND_REASON_TYPE_TAG}>
                             我们根据您的历史标签 ` {movieProps.reason?.tag_reason} ` 记录推荐了这部电影
                             <div>
-                                <Button type="primary" icon={<DislikeOutlined />} onClick={() => this.handleDislike(movieProps.id, "tag")}>
+                                <Button type="primary" icon={<DislikeOutlined />} onClick={() => this.handleDislike(movieProps.reason?.tag_reason_id, "tag")}>
                                     不喜欢
                                 </Button>
                             </div>

@@ -18,6 +18,7 @@ recommendReasonType2Tip.set(RecommendReasonType.RECOMMEND_REASON_TYPE_TOP_K, "æœ
 interface RecommendReasonProps {
     movie_reason: MovieProps
     tag_reason: string
+    tag_reason_id: string
     reason_type: RecommendReasonType
 }
 
