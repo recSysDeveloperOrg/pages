@@ -54,7 +54,7 @@ class MovieDetail extends React.Component<any, any> {
                         {movieProps.language}
                     </DescriptionsItem>
                     <DescriptionsItem label="电影均分">
-                        {movieProps.average_rating}
+                        {movieProps.average_rating?.toFixed(1)}
                     </DescriptionsItem>
                     <DescriptionsItem label="简介">
                         {movieProps.introduction}

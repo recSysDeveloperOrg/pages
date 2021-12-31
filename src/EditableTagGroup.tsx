@@ -1,4 +1,4 @@
-import {Tag, Input, Tooltip, message} from 'antd';
+import {Tag, Input, Tooltip, message, Dropdown, Menu} from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import React from "react";
 import {localFetch, Response} from "./api/fetch";
@@ -13,6 +13,7 @@ class EditableTagGroup extends React.Component<any, any> {
         super(props);
         this.state = {
             tags: Array<TagEntity>(),
+            tagCloud: Array<TagEntity>(),
             inputVisible: false,
             inputValue: '',
             editInputIndex: -1,
@@ -25,14 +26,25 @@ class EditableTagGroup extends React.Component<any, any> {
         const myTags = await localFetch.PostFetch<QueryTagResponse>('/tag/user-movie-tags', {
             movieID,
         });
+        const myTagCloud = await localFetch.PostFetch<QueryTagResponse>('/tag/user-tag-cloud', {
+            n: 10,
+        });
         for (const i in myTags.tags) {
             myTags.tags[i]['key'] = `${i}`;
+        }
+        for (const i in myTagCloud.tags) {
+            myTagCloud.tags[i]['key'] = `${i}`;
         }
         if (myTags.tags === undefined) {
             myTags.tags = Array<TagEntity>();
         }
+        if (myTagCloud.tags === undefined) {
+            myTagCloud.tags = Array<TagEntity>();
+        }
         this.setState({
+            ...this.state,
             tags: myTags.tags,
+            tagCloud: myTagCloud.tags,
             inputVisible: false,
             inputValue: '',
         });
@@ -93,7 +105,20 @@ class EditableTagGroup extends React.Component<any, any> {
     private editInput: any;
 
     render() {
-        const { tags, inputVisible, inputValue, editInputIndex, editInputValue } = this.state;
+        const { tags, tagCloud, inputVisible, inputValue, editInputIndex, editInputValue } = this.state;
+        const userTagCloud = (
+            <Menu>
+                {
+                    tagCloud.map((x: TagEntity) => {
+                        return (
+                            <Menu.Item key={x.key}>
+                                {x.content}
+                            </Menu.Item>
+                        )
+                    })
+                }
+            </Menu>
+        );
         return (
             <>
                 {tags.map((tag:TagEntity, index: number) => {
@@ -146,9 +171,11 @@ class EditableTagGroup extends React.Component<any, any> {
                     />
                 )}
                 {!inputVisible && (
-                    <Tag className="site-tag-plus" onClick={this.showInput}>
-                        <PlusOutlined /> 新增标签
-                    </Tag>
+                    <Dropdown overlay={userTagCloud} placement="bottomCenter">
+                        <Tag className="site-tag-plus" onClick={this.showInput}>
+                            <PlusOutlined /> 新增标签
+                        </Tag>
+                    </Dropdown>
                 )}
             </>
         );

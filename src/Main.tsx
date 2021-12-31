@@ -152,7 +152,7 @@ class MovieCard extends Component<any, any> {
                     cover={<img alt={movieProps.title} style={{width:300, height:450}} src={movieProps.pic_url}/>}>
                 <Row>
                     <Col span={12}>
-                        <Statistic title="评分" value={movieProps.average_rating} suffix="/5"/>
+                        <Statistic title="评分" value={movieProps.average_rating?.toFixed(1)}/>
                     </Col>
                     <Col span={12}>
                         <Button style={{marginTop: 16, float:"right"}} type="primary" onClick={() => this.openDrawer(movieProps, "first")}>
